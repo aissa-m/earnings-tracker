@@ -1,7 +1,22 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, WalletCards } from "lucide-react";
+import {
+  BadgeDollarSign,
+  BriefcaseBusiness,
+  CalendarDays,
+  ChartNoAxesColumnIncreasing,
+  Clock3,
+  Coins,
+  FileText,
+  Layers3,
+  Plus,
+  Sparkles,
+  Trash2,
+  UserRound,
+  UsersRound,
+  WalletCards,
+} from "lucide-react";
 import { Entry, supabase } from "@/lib/supabase";
 
 const people = ["Eva", "Issa"] as const;
@@ -16,6 +31,12 @@ const labelingRates: Record<Entry["project"], number> = {
 
 const reviewRate = 25;
 
+const projectIcons: Record<Entry["project"], typeof FileText> = {
+  Localized: FileText,
+  DenseFusion: Layers3,
+  Textualization: Sparkles,
+};
+
 type FormState = {
   person: Entry["person"];
   work_type: Entry["work_type"];
@@ -26,6 +47,10 @@ type FormState = {
   date: string;
 };
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 const initialForm: FormState = {
   person: "Issa",
   work_type: "Labeling",
@@ -33,7 +58,7 @@ const initialForm: FormState = {
   dr: "",
   hours: "",
   minutes: "",
-  date: new Date().toISOString().slice(0, 10),
+  date: today(),
 };
 
 function money(value: number) {
@@ -56,9 +81,24 @@ function formatAmount(entry: Entry) {
   return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
 }
 
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function FieldIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/55 text-slate-700 shadow-sm backdrop-blur">
+      {children}
+    </span>
+  );
+}
+
 export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [form, setForm] = useState<FormState>(initialForm);
+  const [form, setForm] = useState<FormState>(() => ({ ...initialForm, date: today() }));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -97,6 +137,8 @@ export default function Home() {
 
     return { byPerson, byProject, total };
   }, [entries]);
+
+  const recentEntries = entries.slice(0, 8);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,154 +184,219 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/30 backdrop-blur">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="mb-2 text-sm font-medium uppercase tracking-[0.35em] text-brand">Earnings Tracker</p>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">Control de ingresos</h1>
-            <p className="mt-3 max-w-2xl text-slate-300">
-              Guarda trabajos de Labeling y Reviewing, calcula automáticamente el total por persona y por proyecto.
+    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 pb-24 pt-5 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/55 p-5 shadow-[0_20px_80px_rgba(15,23,42,0.12)] backdrop-blur-2xl sm:p-8">
+        <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand/25 blur-3xl" />
+        <div className="absolute -bottom-24 left-8 h-52 w-52 rounded-full bg-slate-900/10 blur-3xl" />
+
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-slate-700 shadow-sm backdrop-blur">
+              <Sparkles size={14} className="text-brand" /> Earnings
+            </div>
+            <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">{money(stats.total)}</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
+              Control rápido de Labeling y Reviewing, pensado para usarlo desde el móvil.
             </p>
           </div>
-          <div className="rounded-2xl border border-brand/30 bg-brand/10 p-5 text-right">
-            <p className="text-sm text-slate-300">Total general</p>
-            <p className="text-4xl font-black text-brand">{money(stats.total)}</p>
+
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border border-white/80 bg-slate-950 text-white shadow-xl shadow-slate-950/20 sm:h-16 sm:w-16">
+            <WalletCards size={28} />
           </div>
         </div>
-      </header>
 
-      {error && <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-red-200">{error}</div>}
-
-      <section className="grid gap-4 md:grid-cols-3">
-        {people.map((person) => (
-          <article key={person} className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-            <p className="text-sm text-slate-400">Total {person}</p>
-            <p className="mt-2 text-3xl font-bold">{money(stats.byPerson[person])}</p>
-          </article>
-        ))}
-        <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-          <p className="text-sm text-slate-400">Registros</p>
-          <p className="mt-2 text-3xl font-bold">{entries.length}</p>
-        </article>
+        <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-3xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+              <UserRound size={16} /> Issa
+            </div>
+            <p className="text-2xl font-black text-slate-950">{money(stats.byPerson.Issa)}</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+              <UsersRound size={16} /> Eva
+            </div>
+            <p className="text-2xl font-black text-slate-950">{money(stats.byPerson.Eva)}</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-white/60 p-4 shadow-sm backdrop-blur">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+              <BriefcaseBusiness size={16} /> Registros
+            </div>
+            <p className="text-2xl font-black text-slate-950">{entries.length}</p>
+          </div>
+          <div className="rounded-3xl border border-white/70 bg-brand/80 p-4 text-slate-950 shadow-sm backdrop-blur">
+            <div className="mb-3 flex items-center gap-2 text-xs font-black text-slate-800">
+              <BadgeDollarSign size={16} /> Review
+            </div>
+            <p className="text-2xl font-black">$25/h</p>
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[420px_1fr]">
-        <form onSubmit={handleSubmit} className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-2xl bg-brand/15 p-3 text-brand"><WalletCards size={24} /></div>
+      {error && (
+        <div className="mt-4 rounded-3xl border border-red-200 bg-red-50/80 p-4 text-sm font-semibold text-red-700 shadow-sm backdrop-blur">
+          {error}
+        </div>
+      )}
+
+      <section className="mt-5 grid gap-5 lg:grid-cols-[420px_1fr]">
+        <form onSubmit={handleSubmit} className="rounded-[2rem] border border-white/70 bg-white/55 p-5 shadow-[0_20px_80px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <FieldIcon><Plus size={19} /></FieldIcon>
             <div>
-              <h2 className="text-xl font-bold">Añadir registro</h2>
-              <p className="text-sm text-slate-400">Las tarifas se calculan solas.</p>
+              <h2 className="text-xl font-black text-slate-950">Nuevo registro</h2>
+              <p className="text-sm text-slate-500">Guarda DR u horas en segundos.</p>
             </div>
           </div>
 
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Persona
-              <select className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value as Entry["person"] })}>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              <span className="flex items-center gap-2"><UserRound size={16} /> Persona</span>
+              <select className="h-13 rounded-3xl border border-white/70 bg-white/70 px-4 py-3 font-bold text-slate-900 outline-none backdrop-blur transition focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value as Entry["person"] })}>
                 {people.map((person) => <option key={person}>{person}</option>)}
               </select>
             </label>
 
-            <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Tipo
-              <select className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" value={form.work_type} onChange={(e) => setForm({ ...form, work_type: e.target.value as Entry["work_type"] })}>
-                {workTypes.map((type) => <option key={type}>{type}</option>)}
-              </select>
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {workTypes.map((type) => {
+                const active = form.work_type === type;
+                const Icon = type === "Labeling" ? FileText : Clock3;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setForm({ ...form, work_type: type })}
+                    className={`rounded-3xl border p-4 text-left transition ${active ? "border-slate-950 bg-slate-950 text-white shadow-xl shadow-slate-950/20" : "border-white/70 bg-white/65 text-slate-700 backdrop-blur"}`}
+                  >
+                    <Icon size={20} className={active ? "text-brand" : "text-slate-500"} />
+                    <p className="mt-3 text-sm font-black">{type}</p>
+                  </button>
+                );
+              })}
+            </div>
 
-            <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Proyecto
-              <select className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value as Entry["project"] })}>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              <span className="flex items-center gap-2"><Layers3 size={16} /> Proyecto</span>
+              <select className="rounded-3xl border border-white/70 bg-white/70 px-4 py-3 font-bold text-slate-900 outline-none backdrop-blur transition focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value as Entry["project"] })}>
                 {projects.map((project) => <option key={project}>{project}</option>)}
               </select>
             </label>
 
             {form.work_type === "Labeling" ? (
-              <label className="grid gap-2 text-sm font-medium text-slate-300">
-                DR
-                <input className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" type="number" min="0" step="1" value={form.dr} onChange={(e) => setForm({ ...form, dr: e.target.value })} placeholder="Ej: 60" />
+              <label className="grid gap-2 text-sm font-bold text-slate-700">
+                <span className="flex items-center gap-2"><Coins size={16} /> DR realizados</span>
+                <input className="rounded-3xl border border-white/70 bg-white/70 px-4 py-3 text-lg font-black text-slate-950 outline-none backdrop-blur transition placeholder:text-slate-400 focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" type="number" min="0" step="1" value={form.dr} onChange={(e) => setForm({ ...form, dr: e.target.value })} placeholder="Ej: 60" />
               </label>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-2 text-sm font-medium text-slate-300">
-                  Horas
-                  <input className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" type="number" min="0" step="1" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} placeholder="Ej: 3" />
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  <span className="flex items-center gap-2"><Clock3 size={16} /> Horas</span>
+                  <input className="rounded-3xl border border-white/70 bg-white/70 px-4 py-3 text-lg font-black text-slate-950 outline-none backdrop-blur transition placeholder:text-slate-400 focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" type="number" min="0" step="1" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} placeholder="3" />
                 </label>
-                <label className="grid gap-2 text-sm font-medium text-slate-300">
-                  Minutos
-                  <input className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" type="number" min="0" max="59" step="1" value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })} placeholder="Ej: 30" />
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  <span className="flex items-center gap-2"><Clock3 size={16} /> Min</span>
+                  <input className="rounded-3xl border border-white/70 bg-white/70 px-4 py-3 text-lg font-black text-slate-950 outline-none backdrop-blur transition placeholder:text-slate-400 focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" type="number" min="0" max="59" step="1" value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })} placeholder="30" />
                 </label>
               </div>
             )}
 
-            <label className="grid gap-2 text-sm font-medium text-slate-300">
-              Fecha
-              <input className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-3" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              <span className="flex items-center gap-2"><CalendarDays size={16} /> Fecha</span>
+              <input className="rounded-3xl border border-white/70 bg-white/70 px-4 py-3 font-bold text-slate-900 outline-none backdrop-blur transition focus:border-slate-900/20 focus:ring-4 focus:ring-brand/20" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </label>
 
-            <button disabled={saving} className="mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 font-bold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
-              <Plus size={20} /> {saving ? "Guardando..." : "Guardar registro"}
+            <button disabled={saving} className="mt-1 inline-flex items-center justify-center gap-2 rounded-3xl bg-slate-950 px-5 py-4 font-black text-white shadow-xl shadow-slate-950/20 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
+              <Plus size={20} className="text-brand" /> {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </form>
 
-        <div className="grid gap-8">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
-            <h2 className="mb-4 text-xl font-bold">Totales por proyecto</h2>
+        <div className="grid gap-5">
+          <section className="rounded-[2rem] border border-white/70 bg-white/55 p-5 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-slate-950">Proyectos</h2>
+                <p className="text-sm text-slate-500">Totales acumulados</p>
+              </div>
+              <FieldIcon><ChartNoAxesColumnIncreasing size={19} /></FieldIcon>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
-              {projects.map((project) => (
-                <div key={project} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                  <p className="text-sm text-slate-400">{project}</p>
-                  <p className="mt-2 text-2xl font-bold">{money(stats.byProject[project])}</p>
-                </div>
-              ))}
+              {projects.map((project) => {
+                const Icon = projectIcons[project];
+                return (
+                  <article key={project} className="rounded-3xl border border-white/70 bg-white/65 p-4 shadow-sm backdrop-blur">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                        <Icon size={20} className="text-brand" />
+                      </div>
+                      <span className="rounded-full bg-slate-950/5 px-3 py-1 text-xs font-black text-slate-500">
+                        {project === "DenseFusion" ? "$2.60" : project === "Localized" ? "$1.50" : "$2.00"}
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-500">{project}</p>
+                    <p className="mt-1 text-2xl font-black text-slate-950">{money(stats.byProject[project])}</p>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+          <section className="rounded-[2rem] border border-white/70 bg-white/55 p-5 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-bold">Historial</h2>
-              {loading && <p className="text-sm text-slate-400">Cargando...</p>}
+              <div>
+                <h2 className="text-xl font-black text-slate-950">Actividad</h2>
+                <p className="text-sm text-slate-500">Últimos movimientos</p>
+              </div>
+              {loading ? <p className="text-sm font-bold text-slate-500">Cargando...</p> : <FieldIcon><BriefcaseBusiness size={19} /></FieldIcon>}
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-white/10">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                <thead className="bg-white/10 text-slate-300">
-                  <tr>
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">Persona</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3">Proyecto</th>
-                    <th className="px-4 py-3">Cantidad</th>
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {entries.map((entry) => (
-                    <tr key={entry.id} className="bg-slate-950/30">
-                      <td className="px-4 py-3 text-slate-300">{entry.date}</td>
-                      <td className="px-4 py-3 font-semibold">{entry.person}</td>
-                      <td className="px-4 py-3">{entry.work_type}</td>
-                      <td className="px-4 py-3">{entry.project}</td>
-                      <td className="px-4 py-3">{formatAmount(entry)}</td>
-                      <td className="px-4 py-3 font-bold text-brand">{money(getEntryTotal(entry))}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => deleteEntry(entry.id)} className="rounded-xl p-2 text-red-300 transition hover:bg-red-500/10 hover:text-red-200" title="Eliminar">
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!loading && entries.length === 0 && (
-                    <tr>
-                      <td className="px-4 py-8 text-center text-slate-400" colSpan={7}>Todavía no hay registros.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="grid gap-3">
+              {recentEntries.map((entry) => {
+                const Icon = projectIcons[entry.project];
+                return (
+                  <article key={entry.id} className="group rounded-3xl border border-white/70 bg-white/65 p-4 shadow-sm backdrop-blur transition hover:bg-white/80">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-950/10">
+                        <Icon size={20} className="text-brand" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black text-slate-950">{entry.project}</p>
+                            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
+                              <span className="inline-flex items-center gap-1"><UserRound size={13} /> {entry.person}</span>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1">{entry.work_type === "Reviewing" ? <Clock3 size={13} /> : <Coins size={13} />} {entry.work_type}</span>
+                              <span>•</span>
+                              <span>{formatDate(entry.date)}</span>
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-black text-slate-950">{money(getEntryTotal(entry))}</p>
+                            <p className="text-xs font-bold text-slate-500">{formatAmount(entry)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button onClick={() => deleteEntry(entry.id)} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-50" title="Eliminar">
+                        <Trash2 size={14} /> Eliminar
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {!loading && entries.length === 0 && (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white/45 p-8 text-center backdrop-blur">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                    <Plus size={20} className="text-brand" />
+                  </div>
+                  <p className="font-black text-slate-950">Todavía no hay registros</p>
+                  <p className="mt-1 text-sm text-slate-500">Añade el primero desde el formulario.</p>
+                </div>
+              )}
             </div>
           </section>
         </div>
