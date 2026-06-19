@@ -11,6 +11,16 @@ export type Entry = {
   created_at: string;
 };
 
+export type Payment = {
+  id: string;
+  amount: number;
+  issa_amount: number;
+  eva_amount: number;
+  date: string;
+  note: string | null;
+  created_at: string;
+};
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
