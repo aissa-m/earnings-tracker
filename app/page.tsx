@@ -12,8 +12,10 @@ import {
   HandCoins,
   HomeIcon,
   Layers3,
+  PencilLine,
   Plus,
   ReceiptText,
+  RotateCcw,
   Scale,
   Settings2,
   Sparkles,
@@ -106,6 +108,7 @@ export default function Home() {
   const [entryForm, setEntryForm] = useState<EntryForm>({ person: "Issa", work_type: "Labeling", project: "", dr: "", hours: "", minutes: "", date: today() });
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({ amount: "", date: today(), note: "" });
   const [projectForm, setProjectForm] = useState<ProjectForm>(initialProjectForm);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
@@ -251,7 +254,30 @@ export default function Home() {
     else if (!projectForm.supports_labeling && !projectForm.supports_reviewing) setError("El proyecto debe tener Labeling, Reviewing o ambos.");
     else if (projectForm.supports_labeling && (!labelingRate || labelingRate <= 0)) setError("Introduce una tarifa válida para Labeling.");
     else if (projectForm.supports_reviewing && (!reviewingRate || reviewingRate <= 0)) setError("Introduce una tarifa válida para Reviewing.");
-    else {
+    else if (editingProject) {
+      const oldName = editingProject.name;
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          name,
+          supports_labeling: projectForm.supports_labeling,
+          supports_reviewing: projectForm.supports_reviewing,
+          labeling_rate: labelingRate,
+          reviewing_rate: reviewingRate,
+        })
+        .eq("id", editingProject.id);
+
+      if (error) setError(error.message);
+      else {
+        if (oldName !== name) {
+          const { error: entriesError } = await supabase.from("entries").update({ project: name }).eq("project", oldName);
+          if (entriesError) setError(entriesError.message);
+        }
+        setEditingProject(null);
+        setProjectForm(initialProjectForm);
+        await loadData();
+      }
+    } else {
       const { error } = await supabase.from("projects").insert({
         name,
         supports_labeling: projectForm.supports_labeling,
@@ -267,6 +293,25 @@ export default function Home() {
     }
 
     setSavingProject(false);
+  }
+
+  function editProject(project: Project) {
+    setEditingProject(project);
+    setProjectForm({
+      name: project.name,
+      supports_labeling: project.supports_labeling,
+      supports_reviewing: project.supports_reviewing,
+      labeling_rate: project.labeling_rate?.toString() ?? "",
+      reviewing_rate: project.reviewing_rate?.toString() ?? "25",
+    });
+    setView("projects");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelProjectEdit() {
+    setEditingProject(null);
+    setProjectForm(initialProjectForm);
+    setError("");
   }
 
   async function deleteEntry(id: string) {
@@ -367,18 +412,42 @@ export default function Home() {
       ) : (
         <section className="grid gap-5 lg:grid-cols-[420px_1fr]">
           <form onSubmit={handleProjectSubmit} className="glass-card">
-            <SectionTitle icon={<Settings2 size={19} />} title="Nuevo proyecto" subtitle="Puede tener Labeling, Reviewing o ambas." />
+            <SectionTitle icon={editingProject ? <PencilLine size={19} /> : <Settings2 size={19} />} title={editingProject ? "Editar proyecto" : "Nuevo proyecto"} subtitle={editingProject ? "Modifica nombre, tipos y tarifas." : "Puede tener Labeling, Reviewing o ambas."} />
             <div className="grid gap-4">
               <InputLabel icon={<BriefcaseBusiness size={16} />} label="Nombre" type="text" value={projectForm.name} onChange={(value) => setProjectForm({ ...projectForm, name: value })} placeholder="Ej: WorldSim" />
               <div className="grid grid-cols-2 gap-3"><CheckButton active={projectForm.supports_labeling} label="Labeling" icon={<FileText size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_labeling: !projectForm.supports_labeling })} /><CheckButton active={projectForm.supports_reviewing} label="Reviewing" icon={<Clock3 size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_reviewing: !projectForm.supports_reviewing })} /></div>
               {projectForm.supports_labeling && <InputLabel icon={<Coins size={16} />} label="Tarifa Labeling ($/DR)" value={projectForm.labeling_rate} onChange={(value) => setProjectForm({ ...projectForm, labeling_rate: value })} placeholder="Ej: 1.50" step="0.01" />}
               {projectForm.supports_reviewing && <InputLabel icon={<Clock3 size={16} />} label="Tarifa Reviewing ($/h)" value={projectForm.reviewing_rate} onChange={(value) => setProjectForm({ ...projectForm, reviewing_rate: value })} placeholder="Ej: 25" step="0.01" />}
-              <button disabled={savingProject} className="main-button"><Plus size={20} className="text-brand" /> {savingProject ? "Guardando..." : "Crear proyecto"}</button>
+              <button disabled={savingProject} className="main-button"><Plus size={20} className="text-brand" /> {savingProject ? "Guardando..." : editingProject ? "Guardar cambios" : "Crear proyecto"}</button>
+              {editingProject && <button type="button" onClick={cancelProjectEdit} className="inline-flex items-center justify-center gap-2 rounded-3xl border border-white/70 bg-white/70 px-5 py-4 font-black text-slate-700 shadow-sm backdrop-blur transition active:scale-[0.98]"><RotateCcw size={18} /> Cancelar edición</button>}
             </div>
           </form>
 
-          <ListSection title="Gestión de proyectos" subtitle="Activa o pausa proyectos" icon={<Settings2 size={19} />}>
-            <div className="grid gap-3 sm:grid-cols-2">{projects.map((project) => { const Icon = projectIcon(project.name); return <article key={project.id} className={`mini-card ${!project.is_active ? "opacity-55" : ""}`}><div className="mb-4 flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="icon-dark"><Icon size={20} className="text-brand" /></div><div><p className="font-black text-slate-950">{project.name}</p><p className="text-xs font-bold text-slate-500">{project.supports_labeling ? `Labeling $${project.labeling_rate}/DR` : ""} {project.supports_reviewing ? `Reviewing $${project.reviewing_rate}/h` : ""}</p></div></div><button onClick={() => toggleProject(project)} className={`rounded-full px-3 py-1.5 text-xs font-black ${project.is_active ? "bg-brand text-slate-950" : "bg-slate-950 text-white"}`}>{project.is_active ? "Activo" : "Pausado"}</button></div></article>; })}</div>
+          <ListSection title="Gestión de proyectos" subtitle="Activa, pausa o edita proyectos" icon={<Settings2 size={19} />}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {projects.map((project) => {
+                const Icon = projectIcon(project.name);
+                const isEditing = editingProject?.id === project.id;
+
+                return (
+                  <article key={project.id} className={`mini-card ${!project.is_active ? "opacity-55" : ""} ${isEditing ? "ring-4 ring-brand/30" : ""}`}>
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="icon-dark"><Icon size={20} className="text-brand" /></div>
+                        <div>
+                          <p className="font-black text-slate-950">{project.name}</p>
+                          <p className="text-xs font-bold text-slate-500">{project.supports_labeling ? `Labeling $${project.labeling_rate}/DR` : ""} {project.supports_reviewing ? `Reviewing $${project.reviewing_rate}/h` : ""}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleProject(project)} className={`rounded-full px-3 py-1.5 text-xs font-black ${project.is_active ? "bg-brand text-slate-950" : "bg-slate-950 text-white"}`}>{project.is_active ? "Activo" : "Pausado"}</button>
+                    </div>
+                    <div className="flex justify-end">
+                      <button onClick={() => editProject(project)} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-950/5"><PencilLine size={14} /> Editar</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </ListSection>
         </section>
       )}
