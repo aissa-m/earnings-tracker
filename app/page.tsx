@@ -12,6 +12,7 @@ import {
   HandCoins,
   HomeIcon,
   Layers3,
+  LogOut,
   PencilLine,
   Plus,
   ReceiptText,
@@ -30,7 +31,7 @@ const people = ["Eva", "Issa"] as const;
 const workTypes: WorkType[] = ["Labeling", "Reviewing"];
 const defaultReviewRate = 25;
 
-type View = "home" | "projects";
+type View = "home" | "projects" | "timer";
 
 type EntryForm = {
   person: "Eva" | "Issa";
@@ -334,16 +335,39 @@ export default function Home() {
     else setProjects((current) => current.map((item) => (item.id === project.id ? { ...item, is_active: !item.is_active } : item)));
   }
 
+  async function handleLogout() {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/access";
+  }
+
   const splitAmount = Number(paymentForm.amount || 0) / 2;
   const recentEntries = entries.slice(0, 6);
   const recentPayments = payments.slice(0, 5);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 pb-24 pt-5 sm:px-6 lg:px-8">
-      <nav className="sticky top-3 z-20 mb-5 grid grid-cols-2 gap-2 rounded-full border border-white/70 bg-white/70 p-2 shadow-lg backdrop-blur-2xl">
-        <button onClick={() => setView("home")} className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black transition ${view === "home" ? "bg-slate-950 text-white" : "text-slate-600"}`}><HomeIcon size={17} /> Inicio</button>
-        <button onClick={() => setView("projects")} className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-black transition ${view === "projects" ? "bg-slate-950 text-white" : "text-slate-600"}`}><Settings2 size={17} /> Proyectos</button>
-      </nav>
+    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 pb-24 pt-4 sm:px-6 lg:px-8">
+      <header className="sticky top-3 z-20 mb-5 rounded-[1.75rem] border border-white/70 bg-white/75 p-3 shadow-lg backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xl font-black text-brand shadow-lg shadow-slate-950/10">D</div>
+              <div className="leading-tight">
+                <p className="text-base font-black text-slate-950">Dinerico</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Earnings tracker</p>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:hidden"><LogOut size={15} /> Salir</button>
+          </div>
+
+          <nav className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-950/5 p-1.5 sm:flex sm:items-center sm:justify-center">
+            <NavButton active={view === "home"} icon={<HomeIcon size={17} />} label="Inicio" onClick={() => setView("home")} />
+            <NavButton active={view === "projects"} icon={<Settings2 size={17} />} label="Proyectos" onClick={() => setView("projects")} />
+            <NavButton active={view === "timer"} icon={<Clock3 size={17} />} label="Temporizador" onClick={() => setView("timer")} />
+          </nav>
+
+          <button onClick={handleLogout} className="hidden items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:inline-flex"><LogOut size={17} /> Salir</button>
+        </div>
+      </header>
 
       {error && <div className="mb-4 rounded-3xl border border-red-200 bg-red-50/80 p-4 text-sm font-semibold text-red-700 shadow-sm backdrop-blur">{error}</div>}
 
@@ -409,7 +433,7 @@ export default function Home() {
             </div>
           </section>
         </>
-      ) : (
+      ) : view === "projects" ? (
         <section className="grid gap-5 lg:grid-cols-[420px_1fr]">
           <form onSubmit={handleProjectSubmit} className="glass-card">
             <SectionTitle icon={editingProject ? <PencilLine size={19} /> : <Settings2 size={19} />} title={editingProject ? "Editar proyecto" : "Nuevo proyecto"} subtitle={editingProject ? "Modifica nombre, tipos y tarifas." : "Puede tener Labeling, Reviewing o ambas."} />
@@ -450,9 +474,22 @@ export default function Home() {
             </div>
           </ListSection>
         </section>
+      ) : (
+        <section className="glass-card flex min-h-[420px] flex-col items-center justify-center text-center">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-950/20">
+            <Clock3 size={36} className="text-brand" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Temporizador</p>
+          <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Coming soon</h2>
+          <p className="mt-3 max-w-md text-sm font-semibold leading-6 text-slate-500">Aquí irá el cronómetro para iniciar, pausar y guardar sesiones de trabajo.</p>
+        </section>
       )}
     </main>
   );
+}
+
+function NavButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return <button onClick={onClick} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition sm:min-w-32 sm:text-sm ${active ? "bg-slate-950 text-white shadow-lg shadow-slate-950/15" : "text-slate-500 hover:bg-white/80 hover:text-slate-950"}`}>{icon}<span className="truncate">{label}</span></button>;
 }
 
 function Stat({ icon, label, value, sub, green = false }: { icon: React.ReactNode; label: string; value: string; sub?: string; green?: boolean }) {
