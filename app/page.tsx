@@ -25,6 +25,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import TimerSection from "@/components/TimerSection";
 import { Entry, Payment, Project, WorkType, supabase } from "@/lib/supabase";
 
 const people = ["Eva", "Issa"] as const;
@@ -475,14 +476,7 @@ export default function Home() {
           </ListSection>
         </section>
       ) : (
-        <section className="glass-card flex min-h-[420px] flex-col items-center justify-center text-center">
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-950/20">
-            <Clock3 size={36} className="text-brand" />
-          </div>
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Temporizador</p>
-          <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Coming soon</h2>
-          <p className="mt-3 max-w-md text-sm font-semibold leading-6 text-slate-500">Aquí irá el cronómetro para iniciar, pausar y guardar sesiones de trabajo.</p>
-        </section>
+        <TimerSection projects={projects} />
       )}
     </main>
   );
