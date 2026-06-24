@@ -8,6 +8,7 @@ export type Entry = {
   person: Person;
   work_type: WorkType;
   project: string;
+  project_id: string | null;
   amount: number;
   unit: "DR" | "hours";
   date: string;
