@@ -14,6 +14,7 @@ type WorkTimer = {
   status: TimerStatus;
   started_at: number;
   updated_at: number;
+  paused_at?: number | null;
   elapsed_seconds: number;
 };
 
@@ -31,6 +32,15 @@ function formatDuration(totalSeconds: number) {
   const seconds = totalSeconds % 60;
 
   return [hours, minutes, seconds].map((value) => value.toString().padStart(2, "0")).join(":");
+}
+
+function formatTime(timestamp?: number | null) {
+  if (!timestamp) return "--:--";
+
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
 }
 
 function getTimerSeconds(timer: WorkTimer, now: number) {
@@ -92,6 +102,7 @@ export default function TimerSection({ projects }: { projects: Project[] }) {
       status: "running",
       started_at: timestamp,
       updated_at: timestamp,
+      paused_at: null,
       elapsed_seconds: 0,
     };
 
@@ -104,7 +115,7 @@ export default function TimerSection({ projects }: { projects: Project[] }) {
     setTimers((current) =>
       current.map((item) =>
         item.id === timer.id
-          ? { ...item, status: "paused", elapsed_seconds: getTimerSeconds(item, timestamp), updated_at: timestamp }
+          ? { ...item, status: "paused", elapsed_seconds: getTimerSeconds(item, timestamp), updated_at: timestamp, paused_at: timestamp }
           : item
       )
     );
@@ -112,7 +123,7 @@ export default function TimerSection({ projects }: { projects: Project[] }) {
 
   function resumeTimer(timer: WorkTimer) {
     const timestamp = Date.now();
-    setTimers((current) => current.map((item) => (item.id === timer.id ? { ...item, status: "running", updated_at: timestamp } : item)));
+    setTimers((current) => current.map((item) => (item.id === timer.id ? { ...item, status: "running", updated_at: timestamp, paused_at: null } : item)));
   }
 
   function deleteTimer(id: string) {
@@ -182,6 +193,10 @@ export default function TimerSection({ projects }: { projects: Project[] }) {
                         <span className={`rounded-full px-3 py-1 text-xs font-black ${timer.status === "running" ? "bg-brand text-slate-950" : "bg-slate-950 text-white"}`}>{timer.status === "running" ? "En marcha" : "Pausado"}</span>
                       </div>
                       {timer.note && <p className="mt-2 text-sm font-semibold text-slate-500">{timer.note}</p>}
+                      <div className="mt-3 grid gap-2 text-xs font-black text-slate-500 sm:grid-cols-2">
+                        <span className="rounded-2xl bg-slate-950/5 px-3 py-2">Inicio: {formatTime(timer.started_at)}</span>
+                        {timer.status === "paused" && <span className="rounded-2xl bg-slate-950/5 px-3 py-2">Pausado: {formatTime(timer.paused_at ?? timer.updated_at)}</span>}
+                      </div>
                     </div>
 
                     <p className="text-4xl font-black tabular-nums tracking-tight text-slate-950 sm:text-right">{formatDuration(seconds)}</p>
