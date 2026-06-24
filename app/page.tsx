@@ -1,3 +1,3 @@
-import HomeDashboard from "@/components/HomeDashboard";
+import HomeDashboardV2 from "@/components/HomeDashboardV2";
 
-export default HomeDashboard;
+export default HomeDashboardV2;
