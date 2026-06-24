@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BadgeDollarSign, Banknote, BriefcaseBusiness, CalendarDays, Clock3, Coins, FileText, HandCoins, HomeIcon, Layers3, LogOut, PencilLine, Plus, RotateCcw, Settings2, Sparkles, Trash2, UserRound, UsersRound, WalletCards } from "lucide-react";
+import ActivitySection from "@/components/ActivitySection";
 import PaymentSplitForm from "@/components/PaymentSplitForm";
 import TimerSection from "@/components/TimerSection";
 import { Entry, Payment, Project, WorkType, supabase } from "@/lib/supabase";
@@ -14,37 +15,13 @@ type View = "home" | "projects" | "timer";
 type EntryForm = { person: "Eva" | "Issa"; work_type: WorkType; project_id: string; dr: string; hours: string; minutes: string; date: string };
 type ProjectForm = { name: string; supports_labeling: boolean; supports_reviewing: boolean; labeling_rate: string; reviewing_rate: string };
 
-type ResolvedEntry = Entry & { resolved_project_name: string };
-
 const initialProjectForm: ProjectForm = { name: "", supports_labeling: true, supports_reviewing: false, labeling_rate: "", reviewing_rate: "25" };
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0); }
-function formatDate(date: string) { return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(new Date(`${date}T12:00:00`)); }
-function formatAmount(entry: Entry) {
-  if (entry.unit === "DR") return `${entry.amount} DR`;
-  const totalMinutes = Math.round(Number(entry.amount) * 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
-}
-function resolveProject(projects: Project[], entry: Entry) {
-  return projects.find((project) => project.id === entry.project_id) ?? projects.find((project) => project.name === entry.project) ?? null;
-}
-function entryProjectName(projects: Project[], entry: Entry) {
-  return resolveProject(projects, entry)?.name ?? entry.project;
-}
-function entryTotal(projects: Project[], entry: Entry) {
-  const project = resolveProject(projects, entry);
-  const rate = entry.work_type === "Reviewing" ? Number(project?.reviewing_rate ?? defaultReviewRate) : Number(project?.labeling_rate ?? 0);
-  return Number(entry.amount) * rate;
-}
-function projectIcon(projectName: string) {
-  const name = projectName.toLowerCase();
-  if (name.includes("dense")) return Layers3;
-  if (name.includes("text")) return Sparkles;
-  return FileText;
-}
+function resolveProject(projects: Project[], entry: Entry) { return projects.find((project) => project.id === entry.project_id) ?? projects.find((project) => project.name === entry.project) ?? null; }
+function entryTotal(projects: Project[], entry: Entry) { const project = resolveProject(projects, entry); const rate = entry.work_type === "Reviewing" ? Number(project?.reviewing_rate ?? defaultReviewRate) : Number(project?.labeling_rate ?? 0); return Number(entry.amount) * rate; }
+function projectIcon(projectName: string) { const name = projectName.toLowerCase(); if (name.includes("dense")) return Layers3; if (name.includes("text")) return Sparkles; return FileText; }
 
 export default function HomeDashboardV2() {
   const [view, setView] = useState<View>("home");
@@ -70,19 +47,12 @@ export default function HomeDashboardV2() {
     ]);
     if (entriesResult.error) setError(entriesResult.error.message); else setEntries((entriesResult.data ?? []) as Entry[]);
     if (paymentsResult.error) setError(paymentsResult.error.message); else setPayments((paymentsResult.data ?? []) as Payment[]);
-    if (projectsResult.error) setError(projectsResult.error.message); else {
-      const loadedProjects = (projectsResult.data ?? []) as Project[];
-      setProjects(loadedProjects);
-      setEntryForm((current) => ({ ...current, project_id: current.project_id || loadedProjects.find((project) => project.is_active)?.id || "" }));
-    }
+    if (projectsResult.error) setError(projectsResult.error.message); else { const loadedProjects = (projectsResult.data ?? []) as Project[]; setProjects(loadedProjects); setEntryForm((current) => ({ ...current, project_id: current.project_id || loadedProjects.find((project) => project.is_active)?.id || "" })); }
     setLoading(false);
   }
 
   useEffect(() => { loadData(); }, []);
-  useEffect(() => {
-    if (!availableProjects.length) { setEntryForm((current) => ({ ...current, project_id: "" })); return; }
-    if (!availableProjects.some((project) => project.id === entryForm.project_id)) setEntryForm((current) => ({ ...current, project_id: availableProjects[0].id }));
-  }, [availableProjects, entryForm.project_id]);
+  useEffect(() => { if (!availableProjects.length) { setEntryForm((current) => ({ ...current, project_id: "" })); return; } if (!availableProjects.some((project) => project.id === entryForm.project_id)) setEntryForm((current) => ({ ...current, project_id: availableProjects[0].id })); }, [availableProjects, entryForm.project_id]);
 
   const stats = useMemo(() => {
     const generatedByPerson = Object.fromEntries(people.map((person) => [person, 0])) as Record<string, number>;
@@ -90,13 +60,7 @@ export default function HomeDashboardV2() {
     const pendingByPerson = Object.fromEntries(people.map((person) => [person, 0])) as Record<string, number>;
     const byProject = Object.fromEntries(projects.map((project) => [project.id, 0])) as Record<string, number>;
     let generatedTotal = 0; let paidTotal = 0;
-    for (const entry of entries) {
-      const project = resolveProject(projects, entry);
-      const total = entryTotal(projects, entry);
-      generatedByPerson[entry.person] += total;
-      if (project) byProject[project.id] = (byProject[project.id] || 0) + total;
-      generatedTotal += total;
-    }
+    for (const entry of entries) { const project = resolveProject(projects, entry); const total = entryTotal(projects, entry); generatedByPerson[entry.person] += total; if (project) byProject[project.id] = (byProject[project.id] || 0) + total; generatedTotal += total; }
     for (const payment of payments) { paidByPerson.Issa += Number(payment.issa_amount); paidByPerson.Eva += Number(payment.eva_amount); paidTotal += Number(payment.amount); }
     for (const person of people) pendingByPerson[person] = generatedByPerson[person] - paidByPerson[person];
     return { generatedByPerson, paidByPerson, pendingByPerson, byProject, generatedTotal, paidTotal, pendingTotal: generatedTotal - paidTotal };
@@ -109,29 +73,19 @@ export default function HomeDashboardV2() {
     const amount = isReview ? Number(entryForm.hours || 0) + Number(entryForm.minutes || 0) / 60 : Number(entryForm.dr);
     if (!project) setError("Primero crea o selecciona un proyecto válido.");
     else if (!amount || amount <= 0) setError("Introduce una cantidad válida.");
-    else {
-      const { error: entryError } = await supabase.from("entries").insert({ person: entryForm.person, work_type: entryForm.work_type, project: project.name, project_id: project.id, amount, unit: isReview ? "hours" : "DR", date: entryForm.date });
-      if (entryError) setError(entryError.message); else { setEntryForm((current) => ({ ...current, dr: "", hours: "", minutes: "" })); await loadData(); }
-    }
+    else { const { error: entryError } = await supabase.from("entries").insert({ person: entryForm.person, work_type: entryForm.work_type, project: project.name, project_id: project.id, amount, unit: isReview ? "hours" : "DR", date: entryForm.date }); if (entryError) setError(entryError.message); else { setEntryForm((current) => ({ ...current, dr: "", hours: "", minutes: "" })); await loadData(); } }
     setSaving(false);
   }
 
   async function handleProjectSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSavingProject(true); setError("");
-    const name = projectForm.name.trim();
-    const labelingRate = projectForm.supports_labeling ? Number(projectForm.labeling_rate) : null;
-    const reviewingRate = projectForm.supports_reviewing ? Number(projectForm.reviewing_rate || defaultReviewRate) : null;
+    const name = projectForm.name.trim(); const labelingRate = projectForm.supports_labeling ? Number(projectForm.labeling_rate) : null; const reviewingRate = projectForm.supports_reviewing ? Number(projectForm.reviewing_rate || defaultReviewRate) : null;
     if (!name) setError("Introduce el nombre del proyecto.");
     else if (!projectForm.supports_labeling && !projectForm.supports_reviewing) setError("El proyecto debe tener Labeling, Reviewing o ambos.");
     else if (projectForm.supports_labeling && (!labelingRate || labelingRate <= 0)) setError("Introduce una tarifa válida para Labeling.");
     else if (projectForm.supports_reviewing && (!reviewingRate || reviewingRate <= 0)) setError("Introduce una tarifa válida para Reviewing.");
-    else if (editingProject) {
-      const { error: projectError } = await supabase.from("projects").update({ name, supports_labeling: projectForm.supports_labeling, supports_reviewing: projectForm.supports_reviewing, labeling_rate: labelingRate, reviewing_rate: reviewingRate }).eq("id", editingProject.id);
-      if (projectError) setError(projectError.message); else { setEditingProject(null); setProjectForm(initialProjectForm); await loadData(); }
-    } else {
-      const { error: projectError } = await supabase.from("projects").insert({ name, supports_labeling: projectForm.supports_labeling, supports_reviewing: projectForm.supports_reviewing, labeling_rate: labelingRate, reviewing_rate: reviewingRate });
-      if (projectError) setError(projectError.message); else { setProjectForm(initialProjectForm); await loadData(); }
-    }
+    else if (editingProject) { const { error: projectError } = await supabase.from("projects").update({ name, supports_labeling: projectForm.supports_labeling, supports_reviewing: projectForm.supports_reviewing, labeling_rate: labelingRate, reviewing_rate: reviewingRate }).eq("id", editingProject.id); if (projectError) setError(projectError.message); else { setEditingProject(null); setProjectForm(initialProjectForm); await loadData(); } }
+    else { const { error: projectError } = await supabase.from("projects").insert({ name, supports_labeling: projectForm.supports_labeling, supports_reviewing: projectForm.supports_reviewing, labeling_rate: labelingRate, reviewing_rate: reviewingRate }); if (projectError) setError(projectError.message); else { setProjectForm(initialProjectForm); await loadData(); } }
     setSavingProject(false);
   }
 
@@ -142,7 +96,6 @@ export default function HomeDashboardV2() {
   async function toggleProject(project: Project) { const { error: projectError } = await supabase.from("projects").update({ is_active: !project.is_active }).eq("id", project.id); if (projectError) setError(projectError.message); else setProjects((current) => current.map((item) => (item.id === project.id ? { ...item, is_active: !item.is_active } : item))); }
   async function handleLogout() { await fetch("/api/logout", { method: "POST" }); window.location.href = "/access"; }
 
-  const recentEntries = entries.slice(0, 6);
   const recentPayments = payments.slice(0, 5);
 
   return (
@@ -154,53 +107,27 @@ export default function HomeDashboardV2() {
           <HeroStats stats={stats} />
           <section className="mt-5 grid gap-5 lg:grid-cols-[420px_1fr]">
             <div className="grid gap-5">
-              <form onSubmit={handleEntrySubmit} className="glass-card">
-                <SectionTitle icon={<Plus size={19} />} title="Nuevo registro" subtitle="Añade trabajo generado." />
-                <div className="grid gap-4">
-                  <SelectLabel icon={<UserRound size={16} />} label="Persona" value={entryForm.person} onChange={(value) => setEntryForm({ ...entryForm, person: value as "Eva" | "Issa" })} options={people.map((person) => ({ label: person, value: person }))} />
-                  <div className="grid grid-cols-2 gap-3">{workTypes.map((type) => <button key={type} type="button" onClick={() => setEntryForm({ ...entryForm, work_type: type })} className={`rounded-3xl border p-4 text-left transition ${entryForm.work_type === type ? "border-slate-950 bg-slate-950 text-white shadow-xl" : "border-white/70 bg-white/65 text-slate-700 backdrop-blur"}`}>{type === "Labeling" ? <FileText size={20} className={entryForm.work_type === type ? "text-brand" : "text-slate-500"} /> : <Clock3 size={20} className={entryForm.work_type === type ? "text-brand" : "text-slate-500"} />}<p className="mt-3 text-sm font-black">{type}</p></button>)}</div>
-                  <SelectLabel icon={<Layers3 size={16} />} label="Proyecto" value={entryForm.project_id} onChange={(value) => setEntryForm({ ...entryForm, project_id: value })} options={availableProjects.map((project) => ({ label: project.name, value: project.id }))} />
-                  {entryForm.work_type === "Labeling" ? <InputLabel icon={<Coins size={16} />} label="DR realizados" value={entryForm.dr} onChange={(value) => setEntryForm({ ...entryForm, dr: value })} placeholder="Ej: 60" /> : <div className="grid grid-cols-2 gap-3"><InputLabel icon={<Clock3 size={16} />} label="Horas" value={entryForm.hours} onChange={(value) => setEntryForm({ ...entryForm, hours: value })} placeholder="3" /><InputLabel icon={<Clock3 size={16} />} label="Min" value={entryForm.minutes} onChange={(value) => setEntryForm({ ...entryForm, minutes: value })} placeholder="30" max="59" /></div>}
-                  <InputLabel icon={<CalendarDays size={16} />} label="Fecha" type="date" value={entryForm.date} onChange={(value) => setEntryForm({ ...entryForm, date: value })} />
-                  <button disabled={saving} className="main-button"><Plus size={20} className="text-brand" /> {saving ? "Guardando..." : "Guardar trabajo"}</button>
-                </div>
-              </form>
+              <form onSubmit={handleEntrySubmit} className="glass-card"><SectionTitle icon={<Plus size={19} />} title="Nuevo registro" subtitle="Añade trabajo generado." /><div className="grid gap-4"><SelectLabel icon={<UserRound size={16} />} label="Persona" value={entryForm.person} onChange={(value) => setEntryForm({ ...entryForm, person: value as "Eva" | "Issa" })} options={people.map((person) => ({ label: person, value: person }))} /><div className="grid grid-cols-2 gap-3">{workTypes.map((type) => <button key={type} type="button" onClick={() => setEntryForm({ ...entryForm, work_type: type })} className={`rounded-3xl border p-4 text-left transition ${entryForm.work_type === type ? "border-slate-950 bg-slate-950 text-white shadow-xl" : "border-white/70 bg-white/65 text-slate-700 backdrop-blur"}`}>{type === "Labeling" ? <FileText size={20} className={entryForm.work_type === type ? "text-brand" : "text-slate-500"} /> : <Clock3 size={20} className={entryForm.work_type === type ? "text-brand" : "text-slate-500"} />}<p className="mt-3 text-sm font-black">{type}</p></button>)}</div><SelectLabel icon={<Layers3 size={16} />} label="Proyecto" value={entryForm.project_id} onChange={(value) => setEntryForm({ ...entryForm, project_id: value })} options={availableProjects.map((project) => ({ label: project.name, value: project.id }))} />{entryForm.work_type === "Labeling" ? <InputLabel icon={<Coins size={16} />} label="DR realizados" value={entryForm.dr} onChange={(value) => setEntryForm({ ...entryForm, dr: value })} placeholder="Ej: 60" /> : <div className="grid grid-cols-2 gap-3"><InputLabel icon={<Clock3 size={16} />} label="Horas" value={entryForm.hours} onChange={(value) => setEntryForm({ ...entryForm, hours: value })} placeholder="3" /><InputLabel icon={<Clock3 size={16} />} label="Min" value={entryForm.minutes} onChange={(value) => setEntryForm({ ...entryForm, minutes: value })} placeholder="30" max="59" /></div>}<InputLabel icon={<CalendarDays size={16} />} label="Fecha" type="date" value={entryForm.date} onChange={(value) => setEntryForm({ ...entryForm, date: value })} /><button disabled={saving} className="main-button"><Plus size={20} className="text-brand" /> {saving ? "Guardando..." : "Guardar trabajo"}</button></div></form>
               <PaymentSplitForm onSaved={loadData} />
             </div>
             <div className="grid gap-5">
               <ProjectTotals projects={projects} totals={stats.byProject} />
               <PaymentsList payments={recentPayments} onDelete={deletePayment} />
-              <EntriesList entries={recentEntries} projects={projects} onDelete={deleteEntry} />
+              <ActivitySection entries={entries} projects={projects} onDelete={deleteEntry} />
             </div>
           </section>
         </>
       ) : view === "projects" ? (
-        <section className="grid gap-5 lg:grid-cols-[420px_1fr]">
-          <form onSubmit={handleProjectSubmit} className="glass-card">
-            <SectionTitle icon={editingProject ? <PencilLine size={19} /> : <Settings2 size={19} />} title={editingProject ? "Editar proyecto" : "Nuevo proyecto"} subtitle="El nombre puede cambiar sin romper registros." />
-            <div className="grid gap-4">
-              <InputLabel icon={<BriefcaseBusiness size={16} />} label="Nombre" type="text" value={projectForm.name} onChange={(value) => setProjectForm({ ...projectForm, name: value })} placeholder="Ej: WorldSim" />
-              <div className="grid grid-cols-2 gap-3"><CheckButton active={projectForm.supports_labeling} label="Labeling" icon={<FileText size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_labeling: !projectForm.supports_labeling })} /><CheckButton active={projectForm.supports_reviewing} label="Reviewing" icon={<Clock3 size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_reviewing: !projectForm.supports_reviewing })} /></div>
-              {projectForm.supports_labeling && <InputLabel icon={<Coins size={16} />} label="Tarifa Labeling ($/DR)" value={projectForm.labeling_rate} onChange={(value) => setProjectForm({ ...projectForm, labeling_rate: value })} placeholder="Ej: 1.50" step="0.01" />}
-              {projectForm.supports_reviewing && <InputLabel icon={<Clock3 size={16} />} label="Tarifa Reviewing ($/h)" value={projectForm.reviewing_rate} onChange={(value) => setProjectForm({ ...projectForm, reviewing_rate: value })} placeholder="Ej: 25" step="0.01" />}
-              <button disabled={savingProject} className="main-button"><Plus size={20} className="text-brand" /> {savingProject ? "Guardando..." : editingProject ? "Guardar cambios" : "Crear proyecto"}</button>
-              {editingProject && <button type="button" onClick={cancelProjectEdit} className="inline-flex items-center justify-center gap-2 rounded-3xl border border-white/70 bg-white/70 px-5 py-4 font-black text-slate-700 shadow-sm backdrop-blur transition active:scale-[0.98]"><RotateCcw size={18} /> Cancelar edición</button>}
-            </div>
-          </form>
-          <ProjectsAdmin projects={projects} editingProject={editingProject} onEdit={editProject} onToggle={toggleProject} />
-        </section>
+        <section className="grid gap-5 lg:grid-cols-[420px_1fr]"><form onSubmit={handleProjectSubmit} className="glass-card"><SectionTitle icon={editingProject ? <PencilLine size={19} /> : <Settings2 size={19} />} title={editingProject ? "Editar proyecto" : "Nuevo proyecto"} subtitle="El nombre puede cambiar sin romper registros." /><div className="grid gap-4"><InputLabel icon={<BriefcaseBusiness size={16} />} label="Nombre" type="text" value={projectForm.name} onChange={(value) => setProjectForm({ ...projectForm, name: value })} placeholder="Ej: WorldSim" /><div className="grid grid-cols-2 gap-3"><CheckButton active={projectForm.supports_labeling} label="Labeling" icon={<FileText size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_labeling: !projectForm.supports_labeling })} /><CheckButton active={projectForm.supports_reviewing} label="Reviewing" icon={<Clock3 size={20} />} onClick={() => setProjectForm({ ...projectForm, supports_reviewing: !projectForm.supports_reviewing })} /></div>{projectForm.supports_labeling && <InputLabel icon={<Coins size={16} />} label="Tarifa Labeling ($/DR)" value={projectForm.labeling_rate} onChange={(value) => setProjectForm({ ...projectForm, labeling_rate: value })} placeholder="Ej: 1.50" step="0.01" />}{projectForm.supports_reviewing && <InputLabel icon={<Clock3 size={16} />} label="Tarifa Reviewing ($/h)" value={projectForm.reviewing_rate} onChange={(value) => setProjectForm({ ...projectForm, reviewing_rate: value })} placeholder="Ej: 25" step="0.01" />}<button disabled={savingProject} className="main-button"><Plus size={20} className="text-brand" /> {savingProject ? "Guardando..." : editingProject ? "Guardar cambios" : "Crear proyecto"}</button>{editingProject && <button type="button" onClick={cancelProjectEdit} className="inline-flex items-center justify-center gap-2 rounded-3xl border border-white/70 bg-white/70 px-5 py-4 font-black text-slate-700 shadow-sm backdrop-blur transition active:scale-[0.98]"><RotateCcw size={18} /> Cancelar edición</button>}</div></form><ProjectsAdmin projects={projects} editingProject={editingProject} onEdit={editProject} onToggle={toggleProject} /></section>
       ) : <TimerSection projects={projects} />}
     </main>
   );
 }
 
-function AppHeader({ view, setView, onLogout }: { view: View; setView: (view: View) => void; onLogout: () => void }) {
-  return <header className="sticky top-3 z-20 mb-5 rounded-[1.75rem] border border-white/70 bg-white/75 p-3 shadow-lg backdrop-blur-2xl"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xl font-black text-brand shadow-lg shadow-slate-950/10">D</div><div className="leading-tight"><p className="text-base font-black text-slate-950">Dinerico</p><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Earnings tracker</p></div></div><button onClick={onLogout} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:hidden"><LogOut size={15} /> Salir</button></div><nav className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-950/5 p-1.5 sm:flex sm:items-center sm:justify-center"><NavButton active={view === "home"} icon={<HomeIcon size={17} />} label="Inicio" onClick={() => setView("home")} /><NavButton active={view === "projects"} icon={<Settings2 size={17} />} label="Proyectos" onClick={() => setView("projects")} /><NavButton active={view === "timer"} icon={<Clock3 size={17} />} label="Temporizador" onClick={() => setView("timer")} /></nav><button onClick={onLogout} className="hidden items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:inline-flex"><LogOut size={17} /> Salir</button></div></header>;
-}
+function AppHeader({ view, setView, onLogout }: { view: View; setView: (view: View) => void; onLogout: () => void }) { return <header className="sticky top-3 z-20 mb-5 rounded-[1.75rem] border border-white/70 bg-white/75 p-3 shadow-lg backdrop-blur-2xl"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xl font-black text-brand shadow-lg shadow-slate-950/10">D</div><div className="leading-tight"><p className="text-base font-black text-slate-950">Dinerico</p><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Earnings tracker</p></div></div><button onClick={onLogout} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:hidden"><LogOut size={15} /> Salir</button></div><nav className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-950/5 p-1.5 sm:flex sm:items-center sm:justify-center"><NavButton active={view === "home"} icon={<HomeIcon size={17} />} label="Inicio" onClick={() => setView("home")} /><NavButton active={view === "projects"} icon={<Settings2 size={17} />} label="Proyectos" onClick={() => setView("projects")} /><NavButton active={view === "timer"} icon={<Clock3 size={17} />} label="Temporizador" onClick={() => setView("timer")} /></nav><button onClick={onLogout} className="hidden items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-950 hover:text-white lg:inline-flex"><LogOut size={17} /> Salir</button></div></header>; }
 function HeroStats({ stats }: { stats: any }) { return <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/55 p-5 shadow-[0_20px_80px_rgba(15,23,42,0.12)] backdrop-blur-2xl sm:p-8"><div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand/25 blur-3xl" /><div className="relative flex items-start justify-between gap-4"><div><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-slate-700 shadow-sm backdrop-blur"><Sparkles size={14} className="text-brand" /> Earnings</div><p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Pendiente por cobrar</p><h1 className="mt-1 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">{money(stats.pendingTotal)}</h1><p className="mt-2 text-sm leading-6 text-slate-600">Generado: {money(stats.generatedTotal)} · Cobrado: {money(stats.paidTotal)}</p></div><div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border border-white/80 bg-slate-950 text-white shadow-xl"><WalletCards size={28} /></div></div><div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><Stat icon={<UserRound size={16} />} label="Issa pendiente" value={money(stats.pendingByPerson.Issa)} sub={`Cobrado ${money(stats.paidByPerson.Issa)}`} /><Stat icon={<UsersRound size={16} />} label="Eva pendiente" value={money(stats.pendingByPerson.Eva)} sub={`Cobrado ${money(stats.paidByPerson.Eva)}`} /><Stat icon={<Banknote size={16} />} label="Cobrado" value={money(stats.paidTotal)} /><Stat icon={<BadgeDollarSign size={16} />} label="Generado" value={money(stats.generatedTotal)} green /></div></section>; }
 function ProjectTotals({ projects, totals }: { projects: Project[]; totals: Record<string, number> }) { return <ListSection title="Proyectos" subtitle="Totales generados" icon={<BriefcaseBusiness size={19} />}><div className="grid gap-3 sm:grid-cols-2">{projects.map((project) => { const Icon = projectIcon(project.name); return <article key={project.id} className="mini-card"><div className="mb-4 flex items-center justify-between"><div className="icon-dark"><Icon size={20} className="text-brand" /></div><p className="rounded-full bg-slate-950/5 px-3 py-1 text-xs font-black text-slate-500">{project.supports_labeling ? `$${project.labeling_rate}/DR` : ""} {project.supports_reviewing ? `$${project.reviewing_rate}/h` : ""}</p></div><p className="text-sm font-bold text-slate-500">{project.name}</p><p className="mt-1 text-2xl font-black text-slate-950">{money(totals[project.id] || 0)}</p></article>; })}</div></ListSection>; }
 function PaymentsList({ payments, onDelete }: { payments: Payment[]; onDelete: (id: string) => void }) { return <ListSection title="Pagos" subtitle="Dinero ya repartido" icon={<HandCoins size={19} />}><div className="grid gap-3">{payments.map((payment) => <article key={payment.id} className="mini-card"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-slate-950"><Banknote size={21} /></div><div><p className="font-black text-slate-950">{money(Number(payment.amount))}</p><p className="text-xs font-bold text-slate-500">Issa {money(Number(payment.issa_amount))} · Eva {money(Number(payment.eva_amount))}</p></div></div><button onClick={() => onDelete(payment.id)} className="delete-button"><Trash2 size={13} /></button></div>{payment.note && <p className="mt-3 rounded-2xl bg-slate-950/5 px-3 py-2 text-xs font-bold text-slate-500">{payment.note}</p>}</article>)}</div></ListSection>; }
-function EntriesList({ entries, projects, onDelete }: { entries: Entry[]; projects: Project[]; onDelete: (id: string) => void }) { return <ListSection title="Actividad" subtitle="Últimos trabajos" icon={<BriefcaseBusiness size={19} />}><div className="grid gap-3">{entries.map((entry) => { const name = entryProjectName(projects, entry); const Icon = projectIcon(name); return <article key={entry.id} className="mini-card"><div className="flex items-center gap-3"><div className="icon-dark"><Icon size={20} className="text-brand" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><p className="font-black text-slate-950">{name}</p><p className="mt-1 text-xs font-bold text-slate-500">{entry.person} · {entry.work_type} · {formatDate(entry.date)}</p></div><div className="text-right"><p className="text-lg font-black text-slate-950">{money(entryTotal(projects, entry))}</p><p className="text-xs font-bold text-slate-500">{formatAmount(entry)}</p></div></div></div></div><div className="mt-3 flex justify-end"><button onClick={() => onDelete(entry.id)} className="delete-button"><Trash2 size={14} /> Eliminar</button></div></article>; })}</div></ListSection>; }
 function ProjectsAdmin({ projects, editingProject, onEdit, onToggle }: { projects: Project[]; editingProject: Project | null; onEdit: (project: Project) => void; onToggle: (project: Project) => void }) { return <ListSection title="Gestión de proyectos" subtitle="Activa, pausa o edita proyectos" icon={<Settings2 size={19} />}><div className="grid gap-3 sm:grid-cols-2">{projects.map((project) => { const Icon = projectIcon(project.name); const isEditing = editingProject?.id === project.id; return <article key={project.id} className={`mini-card ${!project.is_active ? "opacity-55" : ""} ${isEditing ? "ring-4 ring-brand/30" : ""}`}><div className="mb-4 flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="icon-dark"><Icon size={20} className="text-brand" /></div><div><p className="font-black text-slate-950">{project.name}</p><p className="text-xs font-bold text-slate-500">{project.supports_labeling ? `Labeling $${project.labeling_rate}/DR` : ""} {project.supports_reviewing ? `Reviewing $${project.reviewing_rate}/h` : ""}</p></div></div><button onClick={() => onToggle(project)} className={`rounded-full px-3 py-1.5 text-xs font-black ${project.is_active ? "bg-brand text-slate-950" : "bg-slate-950 text-white"}`}>{project.is_active ? "Activo" : "Pausado"}</button></div><div className="flex justify-end"><button onClick={() => onEdit(project)} className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-950/5"><PencilLine size={14} /> Editar</button></div></article>; })}</div></ListSection>; }
 function FieldIcon({ children }: { children: React.ReactNode }) { return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/55 text-slate-700 shadow-sm backdrop-blur">{children}</span>; }
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) { return <button onClick={onClick} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black transition sm:min-w-32 sm:text-sm ${active ? "bg-slate-950 text-white shadow-lg shadow-slate-950/15" : "text-slate-500 hover:bg-white/80 hover:text-slate-950"}`}>{icon}<span className="truncate">{label}</span></button>; }
