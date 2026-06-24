@@ -113,7 +113,7 @@ export default function HomeDashboardV2() {
             <div className="grid gap-5">
               <ProjectTotals projects={projects} totals={stats.byProject} />
               <PaymentsList payments={recentPayments} onDelete={deletePayment} />
-              <ActivitySection entries={entries} projects={projects} onDelete={deleteEntry} />
+              <ActivitySection entries={entries} projects={projects} onDelete={deleteEntry} onSaved={loadData} />
             </div>
           </section>
         </>
