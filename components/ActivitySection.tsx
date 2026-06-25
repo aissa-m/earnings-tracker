@@ -134,15 +134,12 @@ export default function ActivitySection({ entries, projects, onDelete, onSaved }
     else if (entry.unit === "hours" && (minutes < 0 || minutes > 59)) setError("Los minutos deben estar entre 0 y 59.");
     else if (!amount || amount <= 0) setError("Introduce una cantidad válida.");
     else {
-      const { data, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from("entries")
         .update({ project_id: project.id, project: project.name, amount })
-        .eq("id", entry.id)
-        .select("id")
-        .single();
+        .eq("id", entry.id);
 
       if (updateError) setError(updateError.message);
-      else if (!data?.id) setError("No se ha podido actualizar el registro.");
       else {
         cancelEdit();
         await onSaved();
