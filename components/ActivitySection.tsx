@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, Check, ChevronLeft, ChevronRight, FileText, Layers3, PencilLine, RotateCcw, Sparkles, Trash2 } from "lucide-react";
-import { Entry, Project, supabase } from "@/lib/supabase";
+import { Entry, Project } from "@/lib/supabase";
 
 const people = ["Eva", "Issa"] as const;
 const defaultReviewRate = 25;
@@ -134,12 +134,15 @@ export default function ActivitySection({ entries, projects, onDelete, onSaved }
     else if (entry.unit === "hours" && (minutes < 0 || minutes > 59)) setError("Los minutos deben estar entre 0 y 59.");
     else if (!amount || amount <= 0) setError("Introduce una cantidad válida.");
     else {
-      const { error: updateError } = await supabase
-        .from("entries")
-        .update({ project_id: project.id, project: project.name, amount })
-        .eq("id", entry.id);
+      const response = await fetch(`/api/entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: project.id, amount }),
+      });
 
-      if (updateError) setError(updateError.message);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) setError(data.error || "No se ha podido actualizar el registro.");
       else {
         cancelEdit();
         await onSaved();
