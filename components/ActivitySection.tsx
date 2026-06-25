@@ -6,7 +6,7 @@ import { Entry, Project } from "@/lib/supabase";
 
 const people = ["Eva", "Issa"] as const;
 const defaultReviewRate = 25;
-const pageSize = 6;
+const pageSize = 4;
 
 type EditForm = {
   project_id: string;
