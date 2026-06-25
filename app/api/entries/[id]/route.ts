@@ -4,16 +4,20 @@ import { NextRequest, NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!supabaseUrl || !supabaseKey) {
     return jsonError("Faltan variables de entorno de Supabase en el servidor.", 500);
   }
 
-  const entryId = params.id;
+  const { id: entryId } = await context.params;
   const body = await request.json().catch(() => null);
 
   if (!entryId) return jsonError("Falta el ID del registro.");
